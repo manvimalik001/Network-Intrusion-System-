@@ -1,0 +1,5 @@
+network-intrusion-detection/
+venv/
+__pycache__/
+*.pyc
+KDDTrain+.txt

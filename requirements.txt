@@ -1,0 +1,7 @@
+flask==X.Y.Z
+gunicorn
+joblib==X.Y.Z
+numpy==X.Y.Z
+pandas==X.Y.Z
+scikit-learn==X.Y.Z
+xgboost==X.Y.Z

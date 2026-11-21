@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Network intrusion detector</title>
+<style>
+  :root { --bg:#f6f7f9; --ink:#14181f; --muted:#5b6472; --line:#d5d9e0; --accent:#1d4ed8; --bad:#b42318; --ok:#067647; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#10131a; --ink:#e8ebf1; --muted:#98a2b3; --line:#2a303c; --accent:#7aa2ff; --bad:#ff8a80; --ok:#6ee7a8; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 system-ui, sans-serif; }
+  main { max-width: 46rem; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+  h1 { font-size: 1.6rem; margin: 0 0 .25rem; }
+  p.lead { color: var(--muted); margin: 0 0 1.5rem; max-width: 60ch; }
+  textarea { width:100%; min-height: 9rem; padding:.75rem; border:1px solid var(--line); border-radius:6px;
+             background:transparent; color:inherit; font: 13px/1.4 ui-monospace, Consolas, monospace; }
+  .row { display:flex; gap:.75rem; flex-wrap:wrap; margin:.75rem 0 1.5rem; }
+  button { padding:.6rem 1rem; border-radius:6px; border:1px solid var(--line); background:transparent;
+           color:inherit; font:inherit; cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button:focus-visible, textarea:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  #result { border-top:1px solid var(--line); padding-top:1.25rem; }
+  .verdict { font-size:1.5rem; font-weight:700; }
+  .verdict.attack { color:var(--bad); } .verdict.normal { color:var(--ok); }
+  table { border-collapse:collapse; width:100%; margin-top:1rem; }
+  td { padding:.35rem 0; border-bottom:1px solid var(--line); }
+  td:last-child { text-align:right; font-variant-numeric: tabular-nums; }
+  .bar { height:6px; background:var(--accent); border-radius:3px; margin-top:4px; }
+  .muted { color:var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Network intrusion detector</h1>
+  <p class="lead">Paste one NSL-KDD connection record ({{ n_features }} comma-separated values) or load a random one
+  from the test set. The model labels it normal, DoS, Probe, R2L or U2R.</p>
+
+  <label for="record">Connection record</label>
+  <textarea id="record" spellcheck="false" placeholder="0,tcp,ftp_data,SF,491,0,0,0,0,0,..."></textarea>
+  <div class="row">
+    <button class="primary" id="go">Classify record</button>
+    <button id="sample">Load random test record</button>
+  </div>
+
+  <div id="result" aria-live="polite"><p class="muted">No record classified yet.</p></div>
+</main>
+<script>
+const rec = document.getElementById('record'), out = document.getElementById('result');
+let trueAttack = null;
+
+document.getElementById('sample').onclick = async () => {
+  const r = await (await fetch('/sample')).json();
+  rec.value = r.record; trueAttack = r.true_attack;
+  out.innerHTML = '<p class="muted">Record loaded. Actual label in the test file: <b>' + r.true_attack + '</b></p>';
+};
+
+document.getElementById('go').onclick = async () => {
+  const res = await fetch('/predict', { method:'POST', headers:{'Content-Type':'application/json'},
+                                         body: JSON.stringify({ record: rec.value }) });
+  const d = await res.json();
+  if (!res.ok) { out.innerHTML = '<p class="verdict attack">' + d.error + '</p>'; return; }
+  const cls = d.label === 'normal' ? 'normal' : 'attack';
+  let html = '<div class="verdict ' + cls + '">' + d.label + '</div>' +
+             '<div class="muted">Confidence ' + (d.confidence*100).toFixed(1) + '%</div>';
+  if (trueAttack) html += '<div class="muted">Actual label in the test file: ' + trueAttack + '</div>';
+  html += '<table>';
+  Object.entries(d.probabilities).sort((a,b)=>b[1]-a[1]).forEach(([k,v]) => {
+    html += '<tr><td>' + k + '<div class="bar" style="width:' + (v*100) + '%"></div></td><td>' + (v*100).toFixed(1) + '%</td></tr>';
+  });
+  out.innerHTML = html + '</table>';
+};
+</script>
+</body>
+</html>
